@@ -1,345 +1,280 @@
-
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-} from 'react';
-import {
-  LogBox,
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  useWindowDimensions,
-} from 'react-native';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-
+import React, { useEffect, useState } from 'react';
+import { AppNavigator } from '@multi-tv/shared-ui';
+import { LogBox, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import '../../packages/shared-ui/src/app/configureRemoteControl';
 
 if (__DEV__) {
   LogBox.ignoreLogs([
-    'findNodeHandle is deprecated',
-    'findHostInstance_DEPRECATED is deprecated',
+    /findNodeHandle is deprecated/,
+    /findHostInstance_DEPRECATED is deprecated/,
   ]);
 }
 
-interface LearningContextType {
-  activeModule: string;
-  setActiveModule: (module: string) => void;
-  score: number;
-  setScore: React.Dispatch<React.SetStateAction<number>>;
-}
-
-const LearningContext = createContext<LearningContextType | undefined>(
-  undefined
-);
-
-export const useLearning = () => {
-  const context = useContext(LearningContext);
-
-  if (!context) {
-    throw new Error('useLearning must be used inside LearningContext.Provider');
-  }
-
-  return context;
-};
-
-void SplashScreen.preventAutoHideAsync().catch(() => {});
-
-const MODULES = [
-  {
-    id: 'quiz',
-    emoji: '🦁',
-    title: 'Visual Quiz',
-    description: 'Guess animals & fruits',
-    color: '#F43F5E',
-  },
-  {
-    id: 'story',
-    emoji: '📖',
-    title: 'Story Builder',
-    description: 'Choose your adventure',
-    color: '#8B5CF6',
-  },
-  {
-    id: 'math',
-    emoji: '🍎',
-    title: 'Math Puzzles',
-    description: 'Count objects & numbers',
-    color: '#10B981',
-  },
-];
+SplashScreen.preventAutoHideAsync();
 
 export default function App() {
   const [loaded, error] = useFonts({
     SpaceMono: require('./assets/fonts/SpaceMono-Regular.ttf'),
   });
 
-  const [activeModule, setActiveModule] = useState('home');
-  const [score, setScore] = useState(0);
-  const { width } = useWindowDimensions();
+  const [activeModule, setActiveModule] = useState<'home' | 'quiz' | 'story' | 'math'>('home');
+  const [starScore, setStarScore] = useState(0);
+
+  // --- Quiz Module State ---
+  const [quizStep, setQuizStep] = useState(0);
+  const quizData = [
+    { question: "Who am I? 🦁", options: ["Tiger", "Lion", "Monkey"], correct: 1 },
+    { question: "What fruit is red and crunchy? 🍎", options: ["Apple", "Banana", "Mango"], correct: 0 },
+    { question: "Which animal has a long trunk? 🐘", options: ["Zebra", "Elephant", "Giraffe"], correct: 1 },
+  ];
+  const [quizFeedback, setQuizFeedback] = useState('');
+
+  // --- Story Builder Module State ---
+  const [storyNode, setStoryNode] = useState('start');
+
+  // --- Math Puzzle Module State ---
+  const [mathStep, setMathStep] = useState(0);
+  const mathData = [
+    { emojis: "🍎 🍎 🍎", count: 3, options: [2, 3, 5], correct: 3 },
+    { emojis: "⭐ ⭐ ⭐ ⭐ ⭐", count: 5, options: [4, 5, 6], correct: 5 },
+    { emojis: "🍌 🍌", count: 2, options: [1, 2, 4], correct: 2 },
+  ];
+  const [mathFeedback, setMathFeedback] = useState('');
 
   useEffect(() => {
     if (loaded || error) {
-      void SplashScreen.hideAsync().catch(() => {});
+      SplashScreen.hideAsync();
     }
   }, [loaded, error]);
 
-  if (!loaded && !error) {
-    return null;
+  // --- MODULE 1: VISUAL QUIZ SCREEN ---
+  if (activeModule === 'quiz') {
+    const currentQ = quizData[quizStep];
+    return (
+      <View style={styles.gameContainer}>
+        <Text style={styles.gameHeader}>🦁 Visual Quiz Channel</Text>
+        <Text style={styles.scoreBadge}>⭐ Stars: {starScore}</Text>
+
+        <View style={styles.gameCard}>
+          <Text style={styles.questionText}>{currentQ.question}</Text>
+          <View style={styles.optionsRow}>
+            {currentQ.options.map((opt, idx) => (
+              <TouchableOpacity 
+                key={idx} 
+                style={styles.optionButton}
+                onPress={() => {
+                  if (idx === currentQ.correct) {
+                    setStarScore(s => s + 10);
+                    setQuizFeedback('🎉 Correct! Awesome job!');
+                    setTimeout(() => {
+                      setQuizFeedback('');
+                      if (quizStep < quizData.length - 1) setQuizStep(s => s + 1);
+                      else setQuizStep(0);
+                    }, 1200);
+                  } else {
+                    setQuizFeedback('❌ Oops! Try another one.');
+                  }
+                }}
+              >
+                <Text style={styles.optionText}>{opt}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {quizFeedback ? <Text style={styles.feedbackText}>{quizFeedback}</Text> : null}
+        </View>
+
+        <TouchableOpacity onPress={() => setActiveModule('home')}>
+          <Text style={styles.backLink}>⬅ Back to TV Dashboard</Text>
+        </TouchableOpacity>
+      </View>
+    );
   }
 
-  const isWide = width >= 1000;
+  // --- MODULE 2: STORY BUILDER SCREEN ---
+  if (activeModule === 'story') {
+    return (
+      <View style={styles.gameContainer}>
+        <Text style={styles.gameHeader}>📖 Story Builder (Choose Your Adventure)</Text>
+        <Text style={styles.scoreBadge}>⭐ Stars: {starScore}</Text>
 
-  return (
-    <LearningContext.Provider
-      value={{ activeModule, setActiveModule, score, setScore }}
-    >
-      <View style={styles.container}>
-        {activeModule === 'home' ? (
-          <ScrollView
-            contentContainerStyle={styles.dashboard}
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={styles.welcomeBanner}>
-              <Text style={styles.bannerTitle}>
-                🌟 Welcome to Ella TV Academy
-              </Text>
-              <Text style={styles.bannerSubtitle}>
-                Select a channel with your remote & press OK!
-              </Text>
-            </View>
-
-            <Text style={styles.scoreText}>⭐ Star Score: {score}</Text>
-
-            <View
-              style={[
-                styles.cardContainer,
-                !isWide && styles.cardContainerCompact,
-              ]}
-            >
-              {MODULES.map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[
-                    styles.tvCard,
-                    { backgroundColor: item.color },
-                    !isWide && styles.tvCardCompact,
-                  ]}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Open ${item.title}`}
-                  onPress={() => setActiveModule(item.id)}
-                >
-                  <Text style={styles.cardEmoji}>{item.emoji}</Text>
-                  <Text style={styles.cardTitle}>{item.title}</Text>
-                  <Text style={styles.cardDesc}>
-                    {item.description}
-                  </Text>
-                  <Text style={styles.cardAction}>Press OK →</Text>
+        <View style={styles.gameCard}>
+          {storyNode === 'start' && (
+            <>
+              <Text style={styles.questionText}>🦁 Sher ko bhook lagi hai. Woh kya kare?</Text>
+              <View style={styles.optionsRow}>
+                <TouchableOpacity style={styles.optionButton} onPress={() => { setStoryNode('eatFruit'); setStarScore(s => s + 5); }}>
+                  <Text style={styles.optionText}>[A] Fal Khaye (Eat Fruits)</Text>
                 </TouchableOpacity>
-              ))}
-            </View>
+                <TouchableOpacity style={styles.optionButton} onPress={() => { setStoryNode('hunt'); setStarScore(s => s + 5); }}>
+                  <Text style={styles.optionText}>[B] Shikar Kare (Hunt)</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
 
-            <Text style={styles.footerText}>
-              Learn • Play • Explore • Earn Stars
-            </Text>
-          </ScrollView>
-        ) : (
-          <ScrollView contentContainerStyle={styles.moduleScreen}>
-            <Text style={styles.headerTitle}>
-              {MODULES.find((item) => item.id === activeModule)?.emoji}{' '}
-              {MODULES.find((item) => item.id === activeModule)?.title}
-            </Text>
-
-            <Text style={styles.scoreText}>
-              ⭐ Star Score: {score}
-            </Text>
-
-            <View style={styles.moduleBox}>
-              <Text style={styles.instructions}>
-                {activeModule === 'quiz'
-                  ? 'Ready to identify animals and fruits?'
-                  : activeModule === 'story'
-                    ? 'Ready to create your own adventure?'
-                    : 'Ready to count and solve fun puzzles?'}
-              </Text>
-
-              <TouchableOpacity
-                style={styles.actionButton}
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                onPress={() => setScore((previous) => previous + 10)}
-              >
-                <Text style={styles.actionButtonText}>
-                  🎉 Correct! (+10 Stars)
-                </Text>
+          {storyNode === 'eatFruit' && (
+            <>
+              <Text style={styles.questionText}>🍎 Sher ne meethe fal khaye aur khush ho gaya! Moral: Healthy eating is great.</Text>
+              <TouchableOpacity style={styles.optionButton} onPress={() => setStoryNode('start')}>
+                <Text style={styles.optionText}>🔄 Play Story Again</Text>
               </TouchableOpacity>
-            </View>
+            </>
+          )}
 
-            <TouchableOpacity
-              style={styles.backButtonContainer}
-              accessibilityRole="button"
-              onPress={() => setActiveModule('home')}
-            >
-              <Text style={styles.backButton}>
-                ⬅ Back to TV Dashboard
-              </Text>
-            </TouchableOpacity>
-          </ScrollView>
-        )}
+          {storyNode === 'hunt' && (
+            <>
+              <Text style={styles.questionText}>🌲 Sher jungle mein aage bada aur apne doston ke sath daud lagai!</Text>
+              <TouchableOpacity style={styles.optionButton} onPress={() => setStoryNode('start')}>
+                <Text style={styles.optionText}>🔄 Play Story Again</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+
+        <TouchableOpacity onPress={() => setActiveModule('home')}>
+          <Text style={styles.backLink}>⬅ Back to TV Dashboard</Text>
+        </TouchableOpacity>
       </View>
-    </LearningContext.Provider>
+    );
+  }
+
+  // --- MODULE 3: MATH PUZZLES SCREEN ---
+  if (activeModule === 'math') {
+    const currentMath = mathData[mathStep];
+    return (
+      <View style={styles.gameContainer}>
+        <Text style={styles.gameHeader}>🍎 Math & Object Puzzles</Text>
+        <Text style={styles.scoreBadge}>⭐ Stars: {starScore}</Text>
+
+        <View style={styles.gameCard}>
+          <Text style={styles.emojiDisplay}>{currentMath.emojis}</Text>
+          <Text style={styles.questionText}>How many objects do you see?</Text>
+          
+          <View style={styles.optionsRow}>
+            {currentMath.options.map((num, idx) => (
+              <TouchableOpacity 
+                key={idx} 
+                style={styles.optionButton}
+                onPress={() => {
+                  if (num === currentMath.correct) {
+                    setStarScore(s => s + 10);
+                    setMathFeedback('🌟 Correct counting!');
+                    setTimeout(() => {
+                      setMathFeedback('');
+                      if (mathStep < mathData.length - 1) setMathStep(s => s + 1);
+                      else setMathStep(0);
+                    }, 1200);
+                  } else {
+                    setMathFeedback('❌ Try counting again!');
+                  }
+                }}
+              >
+                <Text style={styles.optionText}>{num}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {mathFeedback ? <Text style={styles.feedbackText}>{mathFeedback}</Text> : null}
+        </View>
+
+        <TouchableOpacity onPress={() => setActiveModule('home')}>
+          <Text style={styles.backLink}>⬅ Back to TV Dashboard</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // --- HOME DASHBOARD ---
+  return (
+    <View style={{ flex: 1 }}>
+      <AppNavigator fontsLoaded={loaded || !!error} />
+      
+      <View style={styles.tvAcademyOverlay}>
+        <View style={styles.welcomeBanner}>
+          <Text style={styles.bannerTitle}>🌟 Welcome to Ella TV Academy</Text>
+          <Text style={styles.bannerSubtitle}>Select a channel with your remote & press OK! | Star Score: {starScore}</Text>
+        </View>
+
+        <View style={styles.cardContainer}>
+          <TouchableOpacity 
+            style={[styles.tvCard, { backgroundColor: '#f43f5e' }]} 
+            onPress={() => setActiveModule('quiz')}
+          >
+            <Text style={styles.cardEmoji}>🦁</Text>
+            <Text style={styles.cardTitle}>Visual Quiz</Text>
+            <Text style={styles.cardDesc}>Guess animals & fruits</Text>
+            <Text style={styles.pressOk}>Press OK →</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.tvCard, { backgroundColor: '#8b5cf6' }]} 
+            onPress={() => setActiveModule('story')}
+          >
+            <Text style={styles.cardEmoji}>📖</Text>
+            <Text style={styles.cardTitle}>Story Builder</Text>
+            <Text style={styles.cardDesc}>Choose your adventure</Text>
+            <Text style={styles.pressOk}>Press OK →</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.tvCard, { backgroundColor: '#10b981' }]} 
+            onPress={() => setActiveModule('math')}
+          >
+            <Text style={styles.cardEmoji}>🍎</Text>
+            <Text style={styles.cardTitle}>Math Puzzles</Text>
+            <Text style={styles.cardDesc}>Count objects & numbers</Text>
+            <Text style={styles.pressOk}>Press OK →</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.footerText}>Learn • Play • Explore • Earn Stars</Text>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0F172A',
-  },
-  dashboard: {
-    flexGrow: 1,
+  tvAcademyOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: '#0f172a',
+    padding: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
-    paddingVertical: 36,
   },
-  welcomeBanner: {
-    alignItems: 'center',
-    marginBottom: 22,
-  },
-  bannerTitle: {
-    fontSize: 38,
-    color: '#F8FAFC',
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  bannerSubtitle: {
-    fontSize: 20,
-    color: '#94A3B8',
-    textAlign: 'center',
-  },
-  scoreText: {
-    fontSize: 23,
-    color: '#FBBF24',
-    fontWeight: '700',
-    marginBottom: 28,
-    textAlign: 'center',
-  },
-  cardContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'stretch',
-    gap: 24,
-    width: '100%',
-    maxWidth: 1200,
-  },
-  cardContainerCompact: {
-    flexDirection: 'column',
-    alignItems: 'center',
-  },
+  welcomeBanner: { marginBottom: 30, alignItems: 'center' },
+  bannerTitle: { fontSize: 40, color: '#f8fafc', fontWeight: 'bold', marginBottom: 8 },
+  bannerSubtitle: { fontSize: 18, color: '#fbbf24', fontWeight: '600' },
+  cardContainer: { flexDirection: 'row', justifyContent: 'center', gap: 30, width: '100%' },
   tvCard: {
-    flex: 1,
-    minHeight: 250,
-    maxWidth: 350,
-    borderRadius: 24,
-    padding: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.25)',
-    elevation: 8,
+    width: 280, height: 250, borderRadius: 24, padding: 25,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 3, borderColor: 'rgba(255,255,255,0.2)',
   },
-  tvCardCompact: {
-    flex: 0,
-    width: '100%',
-    maxWidth: 440,
-    minHeight: 190,
+  cardEmoji: { fontSize: 50, marginBottom: 10 },
+  cardTitle: { fontSize: 24, color: '#ffffff', fontWeight: 'bold', marginBottom: 4 },
+  cardDesc: { fontSize: 14, color: 'rgba(255,255,255,0.8)', textAlign: 'center', marginBottom: 15 },
+  pressOk: { color: '#ffffff', fontWeight: 'bold', fontSize: 16 },
+  footerText: { color: '#64748b', marginTop: 30, fontSize: 14, letterSpacing: 1 },
+  
+  gameContainer: {
+    flex: 1, backgroundColor: '#0f172a', alignItems: 'center', justifyContent: 'center', padding: 20,
   },
-  cardEmoji: {
-    fontSize: 58,
-    marginBottom: 12,
+  gameHeader: { fontSize: 32, color: '#ffffff', fontWeight: 'bold', marginBottom: 10 },
+  scoreBadge: { fontSize: 20, color: '#fbbf24', marginBottom: 25, fontWeight: 'bold' },
+  gameCard: {
+    backgroundColor: '#1e293b', padding: 40, borderRadius: 24, alignItems: 'center', width: '75%',
+    borderWidth: 3, borderColor: '#38bdf8',
   },
-  cardTitle: {
-    fontSize: 25,
-    color: '#FFFFFF',
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 8,
+  questionText: { fontSize: 24, color: '#f8fafc', marginBottom: 25, textAlign: 'center', fontWeight: '600' },
+  optionsRow: { flexDirection: 'row', gap: 20, justifyContent: 'center' },
+  optionButton: {
+    backgroundColor: '#2563eb', paddingVertical: 14, paddingHorizontal: 28, borderRadius: 12,
+    borderWidth: 2, borderColor: '#93c5fd',
   },
-  cardDesc: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    textAlign: 'center',
-  },
-  cardAction: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
-    marginTop: 16,
-  },
-  footerText: {
-    color: '#64748B',
-    fontSize: 16,
-    marginTop: 32,
-    textAlign: 'center',
-  },
-  moduleScreen: {
-    flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  headerTitle: {
-    fontSize: 36,
-    color: '#FFFFFF',
-    fontWeight: '800',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  moduleBox: {
-    backgroundColor: '#1E293B',
-    padding: 32,
-    borderRadius: 24,
-    alignItems: 'center',
-    width: '100%',
-    maxWidth: 760,
-    borderWidth: 3,
-    borderColor: '#38BDF8',
-  },
-  instructions: {
-    color: '#CBD5E1',
-    fontSize: 20,
-    marginBottom: 25,
-    textAlign: 'center',
-  },
-  actionButton: {
-    backgroundColor: '#2563EB',
-    paddingVertical: 16,
-    paddingHorizontal: 28,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: '#93C5FD',
-  },
-  actionButtonText: {
-    color: '#FFFFFF',
-    fontSize: 19,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
-  backButtonContainer: {
-    padding: 18,
-    marginTop: 14,
-  },
-  backButton: {
-    color: '#38BDF8',
-    fontSize: 19,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
+  optionText: { color: '#ffffff', fontSize: 18, fontWeight: 'bold' },
+  feedbackText: { marginTop: 20, fontSize: 20, color: '#4ade80', fontWeight: 'bold' },
+  emojiDisplay: { fontSize: 48, marginBottom: 15 },
+  backLink: { color: '#38bdf8', fontSize: 18, marginTop: 30, fontWeight: 'bold' },
 });
