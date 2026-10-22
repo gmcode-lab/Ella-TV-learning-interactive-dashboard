@@ -1,65 +1,77 @@
 
-import { useFonts } from 'expo-font';
-import * as SplashScreen from 'expo-splash-screen';
 import React, {
-  useEffect,
-  useState,
   createContext,
   useContext,
+  useEffect,
+  useState,
 } from 'react';
-import { AppNavigator } from '@multi-tv/shared-ui';
 import {
   LogBox,
   View,
   Text,
   StyleSheet,
-  Pressable,
+  TouchableOpacity,
+  ScrollView,
+  useWindowDimensions,
 } from 'react-native';
+import { useFonts } from 'expo-font';
+import * as SplashScreen from 'expo-splash-screen';
 
 import '../../packages/shared-ui/src/app/configureRemoteControl';
 
-// Suppress specific deprecation warnings in development.
 if (__DEV__) {
   LogBox.ignoreLogs([
     'findNodeHandle is deprecated',
     'findHostInstance_DEPRECATED is deprecated',
   ]);
-
-  const originalWarn = console.warn;
-
-  console.warn = (...args: unknown[]) => {
-    const message = String(args[0] ?? '');
-
-    if (
-      message.includes('findNodeHandle is deprecated') ||
-      message.includes('findHostInstance_DEPRECATED is deprecated')
-    ) {
-      return;
-    }
-
-    originalWarn(...args);
-  };
 }
 
-// Learning context
 interface LearningContextType {
   activeModule: string;
-  setActiveModule: (mod: string) => void;
+  setActiveModule: (module: string) => void;
   score: number;
   setScore: React.Dispatch<React.SetStateAction<number>>;
 }
 
-const LearningContext = createContext<LearningContextType>({
-  activeModule: 'home',
-  setActiveModule: () => {},
-  score: 0,
-  setScore: () => {},
-});
+const LearningContext = createContext<LearningContextType | undefined>(
+  undefined
+);
 
-export const useLearning = () => useContext(LearningContext);
+export const useLearning = () => {
+  const context = useContext(LearningContext);
 
-// Prevent the splash screen from hiding automatically.
-SplashScreen.preventAutoHideAsync().catch(() => {});
+  if (!context) {
+    throw new Error('useLearning must be used inside LearningContext.Provider');
+  }
+
+  return context;
+};
+
+void SplashScreen.preventAutoHideAsync().catch(() => {});
+
+const MODULES = [
+  {
+    id: 'quiz',
+    emoji: '🦁',
+    title: 'Visual Quiz',
+    description: 'Guess animals & fruits',
+    color: '#F43F5E',
+  },
+  {
+    id: 'story',
+    emoji: '📖',
+    title: 'Story Builder',
+    description: 'Choose your adventure',
+    color: '#8B5CF6',
+  },
+  {
+    id: 'math',
+    emoji: '🍎',
+    title: 'Math Puzzles',
+    description: 'Count objects & numbers',
+    color: '#10B981',
+  },
+];
 
 export default function App() {
   const [loaded, error] = useFonts({
@@ -68,99 +80,116 @@ export default function App() {
 
   const [activeModule, setActiveModule] = useState('home');
   const [score, setScore] = useState(0);
+  const { width } = useWindowDimensions();
 
   useEffect(() => {
     if (loaded || error) {
-      SplashScreen.hideAsync().catch(() => {});
-
-      if (error) {
-        console.warn('Error loading fonts:', error);
-      }
+      void SplashScreen.hideAsync().catch(() => {});
     }
   }, [loaded, error]);
 
-  const moduleTitles: Record<string, string> = {
-    quiz: '🦁 Visual Quiz Channel',
-    story: '📖 Story Builder (Choose Adventure)',
-    math: '🍎 Math & Object Puzzles',
-  };
+  if (!loaded && !error) {
+    return null;
+  }
 
-  const learningContextValue: LearningContextType = {
-    activeModule,
-    setActiveModule,
-    score,
-    setScore,
-  };
+  const isWide = width >= 1000;
 
   return (
-    <LearningContext.Provider value={learningContextValue}>
-      <View style={styles.appContainer}>
+    <LearningContext.Provider
+      value={{ activeModule, setActiveModule, score, setScore }}
+    >
+      <View style={styles.container}>
         {activeModule === 'home' ? (
-          <>
-            <View style={styles.navigatorContainer}>
-              <AppNavigator fontsLoaded={loaded || !!error} />
+          <ScrollView
+            contentContainerStyle={styles.dashboard}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.welcomeBanner}>
+              <Text style={styles.bannerTitle}>
+                🌟 Welcome to Ella TV Academy
+              </Text>
+              <Text style={styles.bannerSubtitle}>
+                Select a channel with your remote & press OK!
+              </Text>
             </View>
 
-            <View style={styles.hackathonBar}>
-              <Pressable
-                style={styles.navButton}
-                onPress={() => setActiveModule('quiz')}
-                accessibilityRole="button"
-              >
-                <Text style={styles.navBtn}>🎮 1. Visual Quiz</Text>
-              </Pressable>
+            <Text style={styles.scoreText}>⭐ Star Score: {score}</Text>
 
-              <Pressable
-                style={styles.navButton}
-                onPress={() => setActiveModule('story')}
-                accessibilityRole="button"
-              >
-                <Text style={styles.navBtn}>📚 2. Story Builder</Text>
-              </Pressable>
-
-              <Pressable
-                style={styles.navButton}
-                onPress={() => setActiveModule('math')}
-                accessibilityRole="button"
-              >
-                <Text style={styles.navBtn}>🔢 3. Math Puzzles</Text>
-              </Pressable>
+            <View
+              style={[
+                styles.cardContainer,
+                !isWide && styles.cardContainerCompact,
+              ]}
+            >
+              {MODULES.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[
+                    styles.tvCard,
+                    { backgroundColor: item.color },
+                    !isWide && styles.tvCardCompact,
+                  ]}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open ${item.title}`}
+                  onPress={() => setActiveModule(item.id)}
+                >
+                  <Text style={styles.cardEmoji}>{item.emoji}</Text>
+                  <Text style={styles.cardTitle}>{item.title}</Text>
+                  <Text style={styles.cardDesc}>
+                    {item.description}
+                  </Text>
+                  <Text style={styles.cardAction}>Press OK →</Text>
+                </TouchableOpacity>
+              ))}
             </View>
-          </>
+
+            <Text style={styles.footerText}>
+              Learn • Play • Explore • Earn Stars
+            </Text>
+          </ScrollView>
         ) : (
-          <View style={styles.container}>
+          <ScrollView contentContainerStyle={styles.moduleScreen}>
             <Text style={styles.headerTitle}>
-              {moduleTitles[activeModule]}
+              {MODULES.find((item) => item.id === activeModule)?.emoji}{' '}
+              {MODULES.find((item) => item.id === activeModule)?.title}
             </Text>
 
-            <Text style={styles.scoreText}>⭐ Score: {score}</Text>
+            <Text style={styles.scoreText}>
+              ⭐ Star Score: {score}
+            </Text>
 
             <View style={styles.moduleBox}>
               <Text style={styles.instructions}>
-                Use your TV remote Left/Right and OK buttons to play!
+                {activeModule === 'quiz'
+                  ? 'Ready to identify animals and fruits?'
+                  : activeModule === 'story'
+                    ? 'Ready to create your own adventure?'
+                    : 'Ready to count and solve fun puzzles?'}
               </Text>
 
-              <Pressable
+              <TouchableOpacity
                 style={styles.actionButton}
-                onPress={() => setScore((previousScore) => previousScore + 10)}
+                activeOpacity={0.8}
                 accessibilityRole="button"
+                onPress={() => setScore((previous) => previous + 10)}
               >
                 <Text style={styles.actionButtonText}>
-                  Correct Answer / Action (+10)
+                  🎉 Correct! (+10 Stars)
                 </Text>
-              </Pressable>
+              </TouchableOpacity>
             </View>
 
-            <Pressable
-              style={styles.backButton}
-              onPress={() => setActiveModule('home')}
+            <TouchableOpacity
+              style={styles.backButtonContainer}
               accessibilityRole="button"
+              onPress={() => setActiveModule('home')}
             >
-              <Text style={styles.backButtonText}>
-                ⬅ Back to Home Dashboard
+              <Text style={styles.backButton}>
+                ⬅ Back to TV Dashboard
               </Text>
-            </Pressable>
-          </View>
+            </TouchableOpacity>
+          </ScrollView>
         )}
       </View>
     </LearningContext.Provider>
@@ -168,104 +197,149 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  appContainer: {
-    flex: 1,
-    backgroundColor: '#0f172a',
-  },
-
-  navigatorContainer: {
-    flex: 1,
-  },
-
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#0F172A',
+  },
+  dashboard: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    paddingVertical: 36,
+  },
+  welcomeBanner: {
+    alignItems: 'center',
+    marginBottom: 22,
+  },
+  bannerTitle: {
+    fontSize: 38,
+    color: '#F8FAFC',
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  bannerSubtitle: {
+    fontSize: 20,
+    color: '#94A3B8',
+    textAlign: 'center',
+  },
+  scoreText: {
+    fontSize: 23,
+    color: '#FBBF24',
+    fontWeight: '700',
+    marginBottom: 28,
+    textAlign: 'center',
+  },
+  cardContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'stretch',
+    gap: 24,
+    width: '100%',
+    maxWidth: 1200,
+  },
+  cardContainerCompact: {
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  tvCard: {
+    flex: 1,
+    minHeight: 250,
+    maxWidth: 350,
+    borderRadius: 24,
+    padding: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.25)',
+    elevation: 8,
   },
-
+  tvCardCompact: {
+    flex: 0,
+    width: '100%',
+    maxWidth: 440,
+    minHeight: 190,
+  },
+  cardEmoji: {
+    fontSize: 58,
+    marginBottom: 12,
+  },
+  cardTitle: {
+    fontSize: 25,
+    color: '#FFFFFF',
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  cardDesc: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+  cardAction: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+    marginTop: 16,
+  },
+  footerText: {
+    color: '#64748B',
+    fontSize: 16,
+    marginTop: 32,
+    textAlign: 'center',
+  },
+  moduleScreen: {
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
   headerTitle: {
-    fontSize: 32,
-    color: '#ffffff',
-    fontWeight: 'bold',
-    marginBottom: 10,
+    fontSize: 36,
+    color: '#FFFFFF',
+    fontWeight: '800',
+    marginBottom: 12,
     textAlign: 'center',
   },
-
-  scoreText: {
-    fontSize: 22,
-    color: '#fbbf24',
-    marginBottom: 30,
-  },
-
   moduleBox: {
-    backgroundColor: '#1e293b',
-    padding: 40,
-    borderRadius: 16,
+    backgroundColor: '#1E293B',
+    padding: 32,
+    borderRadius: 24,
     alignItems: 'center',
-    width: '80%',
-    borderWidth: 2,
-    borderColor: '#38bdf8',
+    width: '100%',
+    maxWidth: 760,
+    borderWidth: 3,
+    borderColor: '#38BDF8',
   },
-
   instructions: {
-    color: '#94a3b8',
-    fontSize: 18,
-    marginBottom: 20,
+    color: '#CBD5E1',
+    fontSize: 20,
+    marginBottom: 25,
     textAlign: 'center',
   },
-
   actionButton: {
-    backgroundColor: '#2563eb',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
+    backgroundColor: '#2563EB',
+    paddingVertical: 16,
+    paddingHorizontal: 28,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#93C5FD',
   },
-
   actionButtonText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    color: '#FFFFFF',
+    fontSize: 19,
+    fontWeight: '800',
     textAlign: 'center',
   },
-
+  backButtonContainer: {
+    padding: 18,
+    marginTop: 14,
+  },
   backButton: {
-    marginTop: 30,
-    padding: 10,
-  },
-
-  backButtonText: {
-    color: '#38bdf8',
-    fontSize: 16,
-    textDecorationLine: 'underline',
-  },
-
-  hackathonBar: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
-    backgroundColor: 'rgba(15, 23, 42, 0.95)',
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    padding: 15,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
-    gap: 12,
-  },
-
-  navButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-  },
-
-  navBtn: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    color: '#38BDF8',
+    fontSize: 19,
+    fontWeight: '700',
+    textAlign: 'center',
   },
 });
